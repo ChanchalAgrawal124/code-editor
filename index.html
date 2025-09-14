@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BugFree Code Editor</title>
+
+<!-- CodeMirror CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/material.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.css" />
+<style>
+  /* Basic Reset */
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #333;
+  }
+  header {
+    background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    font-weight: bold;
+    font-size: 1.2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  #logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  #logo svg {
+    width: 32px;
+    height: 32px;
+  }
+  #theme-selector {
+    font-size: 0.9rem;
+    padding: 0.2rem;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* for flex children to shrink properly */
+  }
+  /* Top editors container */
+  #editors {
+    display: flex;
+    flex: 1 1 50%;
+    min-height: 300px;
+    gap: 10px;
+    padding: 10px;
+    overflow-x: auto;
+  }
+  .editor-panel {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ccc;
+    background: rgba(255,255,255,0.95);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .editor-panel > h2 {
+    margin: 0;
+    padding: 0.5rem;
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    color: white;
+    border-bottom: 1px solid #ccc;
+    font-size: 1rem;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .editor-panel > h2 > select {
+    font-size: 0.8rem;
+    padding: 0.1rem;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+  }
+  .CodeMirror {
+    flex: 1;
+    height: 100% !important;
+  }
+
+  /* Bottom output and console */
+  #output-console {
+    display: flex;
+    flex: 1 1 50%;
+    min-height: 200px;
+    gap: 10px;
+    padding: 10px;
+  }
+  #preview-panel, #console-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ccc;
+    background: rgba(255,255,255,0.95);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  #preview-panel > h2, #console-panel > h2 {
+    margin: 0;
+    padding: 0.5rem;
+    background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+    color: white;
+    border-bottom: 1px solid #ccc;
+    font-size: 1rem;
+    user-select: none;
+  }
+  #preview {
+    flex: 1;
+    border: none;
+    width: 100%;
+  }
+  #console-output {
+    flex: 1;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+
+  /* Buttons */
+  #buttons {
+    padding: 10px;
+    background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+    border-top: 1px solid #ccc;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #007bff;
+    color: white;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  button:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+  }
+  button:active {
+    background: #003d80;
+    transform: translateY(0);
+  }
+  #run-btn {
+    background: #28a745;
+  }
+  #run-btn:hover {
+    background: #1e7e34;
+  }
+
+  /* UI Themes */
+  .theme-light body, .theme-light html {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #333;
+  }
+  .theme-light header {
+    background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%);
+    color: white;
+  }
+  .theme-light .editor-panel {
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #ccc;
+  }
+  .theme-light .editor-panel > h2 {
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    color: white;
+  }
+  .theme-light #preview-panel, .theme-light #console-panel {
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #ccc;
+  }
+  .theme-light #preview-panel > h2, .theme-light #console-panel > h2 {
+    background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+    color: white;
+  }
+  .theme-light #buttons {
+    background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+  }
+
+  .theme-dark body, .theme-dark html {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: #ecf0f1;
+  }
+  .theme-dark header {
+    background: linear-gradient(135deg, #e74c3c 0%, #27ae60 100%);
+    color: white;
+  }
+  .theme-dark .editor-panel {
+    background: rgba(44, 62, 80, 0.95);
+    border: 1px solid #7f8c8d;
+  }
+  .theme-dark .editor-panel > h2 {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+  }
+  .theme-dark #preview-panel, .theme-dark #console-panel {
+    background: rgba(44, 62, 80, 0.95);
+    border: 1px solid #7f8c8d;
+  }
+  .theme-dark #preview-panel > h2, .theme-dark #console-panel > h2 {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+  }
+  .theme-dark #buttons {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+  }
+  .theme-dark #console-output {
+    background: #1e1e1e;
+    color: #d4d4d4;
+  }
+
+  .theme-black body, .theme-black html {
+    background: #000;
+    color: #fff;
+  }
+  .theme-black header {
+    background: #111;
+    color: white;
+  }
+  .theme-black .editor-panel {
+    background: #222;
+    border: 1px solid #444;
+  }
+  .theme-black .editor-panel > h2 {
+    background: #333;
+    color: white;
+  }
+  .theme-black #preview-panel, .theme-black #console-panel {
+    background: #222;
+    border: 1px solid #444;
+  }
+  .theme-black #preview-panel > h2, .theme-black #console-panel > h2 {
+    background: #333;
+    color: white;
+  }
+  .theme-black #buttons {
+    background: #111;
+  }
+  .theme-black #console-output {
+    background: #000;
+    color: #fff;
+  }
+
+  /* Expand feature */
+  .editor-panel.expanded {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 10;
+    flex: none;
+    width: calc(100% - 20px);
+    height: calc(100% - 20px);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    #editors {
+      flex-direction: column;
+      min-height: auto;
+    }
+    #output-console {
+      flex-direction: column;
+      min-height: auto;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div id="logo">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="45" fill="#ff6b6b" stroke="#fff" stroke-width="5"/>
+      <ellipse cx="35" cy="40" rx="8" ry="12" fill="#fff"/>
+      <ellipse cx="65" cy="40" rx="8" ry="12" fill="#fff"/>
+      <circle cx="35" cy="40" r="4" fill="#000"/>
+      <circle cx="65" cy="40" r="4" fill="#000"/>
+      <path d="M 30 60 Q 50 70 70 60" stroke="#000" stroke-width="3" fill="none"/>
+      <text x="50" y="85" text-anchor="middle" fill="#fff" font-size="12" font-family="Arial" font-weight="bold">BugFree</text>
+    </svg>
+    BugFree Code Editor
+  </div>
+  <div id="theme-selectors">
+    <select id="ui-theme-selector">
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="black">Black</option>
+    </select>
+    <select id="theme-selector">
+      <option value="default">Default</option>
+      <option value="material">Material</option>
+      <option value="dracula">Dracula</option>
+      <option value="monokai">Monokai</option>
+    </select>
+  </div>
+</header>
+
+<main>
+  <section id="editors">
+    <div class="editor-panel">
+      <h2>HTML <select class="lang-select" data-editor="html">
+        <option value="text/html">HTML</option>
+        <option value="text/markdown">Markdown</option>
+        <option value="application/json">JSON</option>
+      </select></h2>
+      <textarea id="html-editor"><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Page</title>
+</head>
+<body>
+  <h1>Hello, World!</h1>
+  <p>This is a sample HTML snippet.</p>
+</body>
+</html></textarea>
+    </div>
+    <div class="editor-panel">
+      <h2>CSS <select class="lang-select" data-editor="css">
+        <option value="css">CSS</option>
+        <option value="scss">SCSS</option>
+        <option value="less">LESS</option>
+      </select></h2>
+      <textarea id="css-editor">body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+h1 {
+  color: #007bff;
+}</textarea>
+    </div>
+    <div class="editor-panel">
+      <h2>JavaScript <select class="lang-select" data-editor="js">
+        <option value="javascript">JavaScript</option>
+        <option value="typescript">TypeScript</option>
+        <option value="coffeescript">CoffeeScript</option>
+      </select></h2>
+      <textarea id="js-editor">console.log('Hello from BugFree!');
+
+function greet(name) {
+  return 'Hello, ' + name + '!';
+}
+
+alert(greet('User'));</textarea>
+    </div>
+    <div class="editor-panel">
+      <h2>Python <select class="lang-select" data-editor="python">
+        <option value="python">Python</option>
+      </select></h2>
+      <textarea id="python-editor">print("Hello, World!")
+
+def add(a, b):
+    return a + b
+
+result = add(5, 3)
+print(f"5 + 3 = {result}")</textarea>
+    </div>
+    <div class="editor-panel">
+      <h2>Java <select class="lang-select" data-editor="java">
+        <option value="text/x-java">Java</option>
+      </select></h2>
+      <textarea id="java-editor">public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}</textarea>
+    </div>
+    <div class="editor-panel">
+      <h2>C++ <select class="lang-select" data-editor="cpp">
+        <option value="text/x-c++src">C++</option>
+        <option value="text/x-csrc">C</option>
+      </select></h2>
+      <textarea id="cpp-editor">#include <iostream>
+
+int main() {
+    std::cout << "Hello, World!" << std::endl;
+    return 0;
+}</textarea>
+    </div>
+  </section>
+
+  <section id="output-console">
+    <div id="preview-panel">
+      <h2>Live Preview</h2>
+      <iframe id="preview" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    <div id="console-panel">
+      <h2>Console Output</h2>
+      <div id="console-output"></div>
+    </div>
+  </section>
+</main>
+
+<div id="buttons">
+  <button id="run-btn" title="Run the code (for JS only)">Run Code</button>
+  <button id="download-btn" title="Download your code as an HTML file">Download Code</button>
+  <button id="clear-btn" title="Clear all editors and console">Clear Code</button>
+</div>
+
+<!-- CodeMirror JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+<!-- CodeMirror modes -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/markdown/markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/coffeescript/coffeescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/simple.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/meta.min.js"></script>
+<!-- CodeMirror addons for hints and more -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/javascript-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/css-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/html-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/python-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/anyword-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/search/search.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/search/searchcursor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/dialog/dialog.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/dialog/dialog.min.css" />
+
+<script>
+  // Define modes for TypeScript and SCSS (simple modes)
+  CodeMirror.defineSimpleMode("typescript", {
+    start: [
+      {regex: /(?:function|var|let|const|if|for|while|return|class|import|export)\b/, token: "keyword"},
+      {regex: /\/\/.*/, token: "comment"},
+      {regex: /\/\*/, token: "comment", next: "comment"},
+      {regex: /[-+\/*=<>!]+/, token: "operator"},
+      {regex: /"([^"]*)"/, token: "string"},
+      {regex: /'([^']*)'/, token: "string"},
+      {regex: /\d+/, token: "number"}
+    ],
+    comment: [
+      {regex: /.*?\*\//, token: "comment", next: "start"},
+      {regex: /.*/, token: "comment"}
+    ],
+    meta: {lineComment: "//"}
+  });
+
+  CodeMirror.defineSimpleMode("scss", {
+    start: [
+      {regex: /@(?:import|include|extend|if|for|each|while|return)\b/, token: "keyword"},
+      {regex: /\$[\w-]+/, token: "variable"},
+      {regex: /\/\/.*/, token: "comment"},
+      {regex: /\/\*/, token: "comment", next: "comment"},
+      {regex: /\{/, indent: true},
+      {regex: /\}/, dedent: true},
+      {regex: /[-+\/*=<>!]+/, token: "operator"},
+      {regex: /"([^"]*)"/, token: "string"},
+      {regex: /'([^']*)'/, token: "string"},
+      {regex: /#[a-fA-F0-9]{3,6}/, token: "atom"},
+      {regex: /\d+/, token: "number"}
+    ],
+    comment: [
+      {regex: /.*?\*\//, token: "comment", next: "start"},
+      {regex: /.*/, token: "comment"}
+    ],
+    meta: {lineComment: "//"}
+  });
+
+  // Initialize CodeMirror editors
+  const editors = {};
+  const editorConfigs = {
+    html: {mode: 'text/html', default: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>My Page</title>\n</head>\n<body>\n  <h1>Hello, World!</h1>\n  <p>This is a sample HTML snippet.</p>\n</body>\n</html>'},
+    css: {mode: 'css', default: 'body {\n  font-family: Arial, sans-serif;\n  background-color: #f0f0f0;\n  color: #333;\n}\n\nh1 {\n  color: #007bff;\n}'},
+    js: {mode: 'javascript', default: 'console.log(\'Hello from BugFree!\');\n\nfunction greet(name) {\n  return \'Hello, \' + name + \'!\';\n}\n\nalert(greet(\'User\'));'},
+    python: {mode: 'python', default: 'print("Hello, World!")\n\ndef add(a, b):\n    return a + b\n\nresult = add(5, 3)\nprint(f"5 + 3 = {result}")'},
+    java: {mode: 'text/x-java', default: 'public class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}'},
+    cpp: {mode: 'text/x-c++src', default: '#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}'}
+  };
+
+  Object.keys(editorConfigs).forEach(key => {
+    const config = editorConfigs[key];
+    const textarea = document.getElementById(`${key}-editor`);
+    editors[key] = CodeMirror.fromTextArea(textarea, {
+      mode: config.mode,
+      lineNumbers: true,
+      tabSize: 2,
+      theme: 'default',
+      lineWrapping: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      extraKeys: {
+        "Ctrl-Space": "autocomplete",
+        "Ctrl-F": "findPersistent",
+        "Ctrl-S": function() { saveCode(); },
+        "F11": function(cm) { cm.setOption("fullScreen", !cm.getOption("fullScreen")); },
+        "Esc": function(cm) { if (cm.getOption("fullScreen")) cm.setOption("fullScreen", false); }
+      }
+    });
+  });
+
+  // Auto-hints on typing
+  Object.values(editors).forEach(editor => {
+    editor.on('inputRead', function(cm, change) {
+      if (!cm.state.completionActive && change.text.length > 0 && change.text[0] !== ' ') {
+        CodeMirror.commands.autocomplete(cm);
+      }
+    });
+  });
+
+  // Expand feature
+  document.querySelectorAll('.editor-panel > h2').forEach(header => {
+    header.addEventListener('click', (e) => {
+      if (e.target.tagName === 'SELECT') return; // Don't expand if clicking on select
+      const panel = header.parentElement;
+      const isExpanded = panel.classList.contains('expanded');
+      document.querySelectorAll('.editor-panel').forEach(p => {
+        p.classList.remove('expanded');
+        p.style.display = '';
+      });
+      if (!isExpanded) {
+        panel.classList.add('expanded');
+        document.querySelectorAll('.editor-panel').forEach(p => {
+          if (p !== panel) p.style.display = 'none';
+        });
+      }
+    });
+  });
+
+  // Elements
+  const previewFrame = document.getElementById('preview');
+  const consoleOutput = document.getElementById('console-output');
+  const downloadBtn = document.getElementById('download-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const runBtn = document.getElementById('run-btn');
+  const themeSelector = document.getElementById('theme-selector');
+  const uiThemeSelector = document.getElementById('ui-theme-selector');
+
+  // LocalStorage keys
+  const LS_KEYS = {
+    html: 'bugfree_html',
+    css: 'bugfree_css',
+    js: 'bugfree_js',
+    python: 'bugfree_python',
+    java: 'bugfree_java',
+    cpp: 'bugfree_cpp',
+    ui_theme: 'bugfree_ui_theme',
+    editor_theme: 'bugfree_editor_theme'
+  };
+
+  // Load saved code from localStorage or default starter code
+  function loadCode() {
+    Object.keys(editors).forEach(key => {
+      const value = localStorage.getItem(LS_KEYS[key]) || editorConfigs[key].default;
+      editors[key].setValue(value);
+    });
+  }
+
+  // Save code to localStorage
+  function saveCode() {
+    Object.keys(editors).forEach(key => {
+      localStorage.setItem(LS_KEYS[key], editors[key].getValue());
+    });
+  }
+
+  // Clear console output
+  function clearConsole() {
+    consoleOutput.textContent = '';
+  }
+
+  // Append message to console output
+  function appendConsoleMessage(msg, type = 'log') {
+    const span = document.createElement('span');
+    span.textContent = msg + '\n';
+    const isDark = document.body.classList.contains('theme-dark') || document.body.classList.contains('theme-black');
+    if (type === 'error') {
+      span.style.color = isDark ? '#ff6b6b' : '#ff5555';
+      span.style.fontWeight = 'bold';
+    } else if (type === 'warn') {
+      span.style.color = isDark ? '#f1fa8c' : '#f39c12';
+    } else {
+      span.style.color = isDark ? '#d4d4d4' : '#333';
+    }
+    consoleOutput.appendChild(span);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+  }
+
+  // Build the full HTML content for iframe
+  function buildPreviewContent() {
+    const html = editors.html.getValue();
+    const css = editors.css.getValue();
+    const js = editors.js.getValue();
+
+    // We inject a script to override console methods and forward logs/errors to parent window
+    // Use postMessage to communicate with parent window
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>${css}</style>
+</head>
+<body>
+${html}
+
+<script>
+  (function() {
+    // Override console methods to send messages to parent
+    function sendMessage(type, args) {
+      parent.postMessage({type: type, args: Array.from(args)}, '*');
+    }
+    console.log = function() { sendMessage('log', arguments); };
+    console.info = function() { sendMessage('info', arguments); };
+    console.warn = function() { sendMessage('warn', arguments); };
+    console.error = function() { sendMessage('error', arguments); };
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      sendMessage('error', [message + ' (at ' + lineno + ':' + colno + ')']);
+    };
+
+    try {
+      ${js}
+    } catch(e) {
+      sendMessage('error', [e.message]);
+    }
+  })();
+<\/script>
+</body>
+</html>
+    `;
+  }
+
+  // Update iframe preview
+  function updatePreview() {
+    clearConsole();
+    const content = buildPreviewContent();
+    const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    previewDoc.open();
+    previewDoc.write(content);
+    previewDoc.close();
+  }
+
+  // Listen for messages from iframe to capture console logs/errors
+  window.addEventListener('message', (event) => {
+    if (!event.data) return;
+    const {type, args} = event.data;
+    if (!type || !args) return;
+
+    // Format args nicely
+    const formatted = args.map(arg => {
+      if (typeof arg === 'object') {
+        try {
+          return JSON.stringify(arg);
+        } catch {
+          return String(arg);
+        }
+      }
+      return String(arg);
+    }).join(' ');
+
+    appendConsoleMessage(formatted, type);
+  });
+
+  // Save and update preview on editor changes (debounced)
+  let updateTimeout;
+  function scheduleUpdate() {
+    saveCode();
+    clearTimeout(updateTimeout);
+    updateTimeout = setTimeout(updatePreview, 300);
+  }
+
+  Object.values(editors).forEach(editor => {
+    editor.on('change', scheduleUpdate);
+  });
+
+  // Handle language selector changes
+  document.querySelectorAll('.lang-select').forEach(select => {
+    select.addEventListener('change', (e) => {
+      const editorKey = e.target.getAttribute('data-editor');
+      const mode = e.target.value;
+      editors[editorKey].setOption('mode', mode);
+    });
+  });
+
+  // Theme selector
+  themeSelector.addEventListener('change', (e) => {
+    const theme = e.target.value;
+    Object.values(editors).forEach(editor => {
+      editor.setOption('theme', theme);
+    });
+    // Save theme selection
+    localStorage.setItem(LS_KEYS.editor_theme, theme);
+  });
+
+  // UI Theme selector
+  uiThemeSelector.addEventListener('change', (e) => {
+    const uiTheme = e.target.value;
+    document.body.classList.remove('theme-light', 'theme-dark', 'theme-black');
+    if (uiTheme === 'light') {
+      document.body.classList.add('theme-light');
+    } else if (uiTheme === 'dark') {
+      document.body.classList.add('theme-dark');
+    } else if (uiTheme === 'black') {
+      document.body.classList.add('theme-black');
+    }
+    // Save UI theme selection
+    localStorage.setItem(LS_KEYS.ui_theme, uiTheme);
+  });
+
+  // Load saved UI theme on startup
+  function loadUITheme() {
+    const savedTheme = localStorage.getItem(LS_KEYS.ui_theme) || 'light';
+    uiThemeSelector.value = savedTheme;
+    uiThemeSelector.dispatchEvent(new Event('change'));
+  }
+
+  // Download code as .html file
+  downloadBtn.addEventListener('click', () => {
+    const content = buildPreviewContent();
+    const blob = new Blob([content], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bugfree-code.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Run code (for JS)
+  runBtn.addEventListener('click', () => {
+    updatePreview();
+  });
+
+  // Clear code and console
+  clearBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to clear all code and console output?')) {
+      Object.values(editors).forEach(editor => {
+        editor.setValue('');
+      });
+      clearConsole();
+      saveCode();
+      updatePreview();
+    }
+  });
+
+  // Initial load
+  loadCode();
+  loadUITheme();
+  updatePreview();
+
+  // Make editors resize properly on window resize
+  window.addEventListener('resize', () => {
+    Object.values(editors).forEach(editor => editor.refresh());
+  });
+</script>
+
+</body>
+</html>
